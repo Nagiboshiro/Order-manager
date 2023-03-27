@@ -1,0 +1,162 @@
+﻿@using OrderManager.Integration.Http
+@using Microsoft.AspNetCore.Components
+@using FluentValidation
+@using OrderManager.Client.Extensions
+@using OrderManager.Integration.Http.Models.Orders
+@using OrderManager.Integration.Http.Models.Providers
+@using Severity = MudBlazor.Severity
+@using System.Net
+ 
+@inject ISnackbar Snackbar;
+@inject IOrderManager ApiClient;
+
+<MudDialog>
+    <DialogContent>
+        <MudText Style="text-align: center; font-weight: bold">Создать заказ</MudText>
+        <MudForm Model="@_model" @bind-IsValid="@_modelIsValid" @ref="@_form">
+            <MudGrid>
+                <MudItem xs="12" sm="12" md="12">
+                    <MudSelect
+                        Label="Поставщик"
+                        T="string"
+                        Adornment="Adornment.Start"
+                        AdornmentIcon="@Icons.Material.Filled.Computer"
+                        Variant="Variant.Text"
+                        IconSize="Size.Medium"
+                        Value="_providers.FirstOrDefault(i => i.ProviderId == _model.ProviderId)?.Name"
+                        SelectedValuesChanged="enumerable => _model.ProviderId = Guid.Parse(enumerable.First())">
+                        @foreach (var provider in _providers)
+                        {
+                            <MudSelectItem Value="@(provider.ProviderId.ToString())">@provider.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="12" md="12">
+                    <MudTextField
+                        T="string"
+                        Label="Номер"
+                        Placeholder="Номер"
+                        Adornment="Adornment.Start"
+                        AdornmentIcon="@Icons.Material.Filled.Flag"
+                        @bind-Value="_model.Number"
+                        Validation="@(_modelValidator.ValidateValue())"
+                        For="@(() => _model.Number)"
+                        Immediate="false"
+                        IconSize="Size.Medium"/>
+                </MudItem>
+                <MudItem xs="12" sm="12" md="12">
+                    <MudTextField
+                        Format="s"
+                        Label="Дата"
+                        InputType="InputType.DateTimeLocal"
+                        Adornment="Adornment.Start"
+                        AdornmentIcon="@Icons.Material.Filled.Flag"
+                        @bind-Value="_model.Date"
+                        Validation="@(_modelValidator.ValidateValue())"
+                        For="@(() => _model.Date)"
+                        Immediate="false"
+                        IconSize="Size.Medium"/>
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Size="Size.Large" OnClick="Cancel">Отменить</MudButton>
+        <MudButton Size="Size.Large" OnClick="Submit" Color="Color.Primary">Создать</MudButton>
+    </DialogActions>
+</MudDialog>
+
+
+@code {
+    [CascadingParameter]
+    MudDialogInstance MudDialogInstance { get; set; } = null!;
+
+    MudForm _form = null!;
+
+    private IEnumerable<GetProvidersList> _providers = ArraySegment<GetProvidersList>.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _providers = await GetProviders();
+
+        await base.OnInitializedAsync();
+    }
+
+    private async Task<IEnumerable<GetProvidersList>> GetProviders()
+    {
+        var response = await ApiClient.GetProvidersAsync(new GetProvidersListRequest());
+
+        return response.StatusCode == HttpStatusCode.OK ? response.Content! : ArraySegment<GetProvidersList>.Empty;
+    }
+
+    private readonly CreateOrderModel _model = new()
+    {
+        OrderId = Guid.NewGuid(),
+        Date = DateTime.Now 
+    };
+
+    private readonly CreateOrderModel.Validator _modelValidator = new();
+
+    private bool _modelIsValid;
+
+    Task Submit() => CreateOrder();
+    void Cancel() => MudDialogInstance.Cancel();
+
+    private async Task CreateOrder()
+    {
+        await _form.Validate();
+
+        if (_modelIsValid is false)
+        {
+            return;
+        }
+
+        var response = await ApiClient.CreateOrderAsync(new CreateOrderRequest()
+        {
+            ProviderId = _model.ProviderId,
+            OrderId = _model.OrderId,
+            Number = _model.Number,
+            Date = DateTime.SpecifyKind(_model.Date, DateTimeKind.Utc),
+        });
+
+        if (response.IsSuccessStatusCode)
+        {
+            Snackbar.Add($"Заказ успешно создан", Severity.Success, options => { options.CloseAfterNavigation = true; });
+            MudDialogInstance.Close(DialogResult.Ok(true));
+        }
+        else
+        {
+            Snackbar.Add($"{response.StatusCode}: {response.Error?.Content ?? "Что то пошло не так"}", Severity.Error, options => { options.CloseAfterNavigation = true; });
+        }
+}
+
+
+    private sealed class CreateOrderModel
+    {
+        public Guid ProviderId { get; set; }
+        public Guid OrderId { get; set; }
+        public string Number { get; set; } = null!;
+        public DateTime Date { get; set; }
+
+        internal sealed class Validator : AbstractValidator<CreateOrderModel>
+        {
+            public Validator()
+            {
+                RuleFor(m => m.ProviderId)
+                    .NotEmpty()
+                    .WithMessage("Must be provided");
+
+                RuleFor(m => m.OrderId)
+                    .NotEmpty()
+                    .WithMessage("Must be provided");
+
+                RuleFor(m => m.Number)
+                    .NotEmpty()
+                    .WithMessage("Must be provided")
+                    .MaximumLength(64)
+                    .WithMessage("Length must be less than 64 or equal to 64");
+            }
+        }
+    }
+
+}

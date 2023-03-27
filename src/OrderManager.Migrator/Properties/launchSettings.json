@@ -1,0 +1,11 @@
+﻿{
+  "profiles": {
+    "PaymentManager.Migrator": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      },
+      "dotnetRunMessages": true
+    }
+  }
+}

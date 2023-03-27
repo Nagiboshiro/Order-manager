@@ -1,0 +1,337 @@
+﻿@page "/orders/{orderId:guid}"
+
+@using OrderManager.Integration.Http
+@using OrderManager.Integration.Http.Models.Providers
+@using System.Net
+@using OrderManager.Client.Pages.Orders.Components
+@using OrderManager.Integration.Http.Models.Orders
+
+@inject ISnackbar Snackbar;
+@inject IDialogService DialogService;
+@inject IOrderManager ApiClient;
+
+<PageTitle>Заказ: @OrderId.ToString("N")</PageTitle>
+
+<MudGrid>
+    <MudItem xs="9" sm="9" md="9">
+        <MudBreadcrumbs Items="_breadcrumbItems"/>
+    </MudItem>
+
+    <MudItem xs="3" sm="3" md="3" Style="text-align: end">
+        @if (_loading)
+        {
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true"/>
+        }
+        else
+        {
+            @if (_loaded)
+            {
+                <MudTooltip Delay="500" Text="Создать заказ">
+                    <MudIconButton
+                        Icon="@Icons.Material.Filled.Add"
+                        OnClick="() => CreateOrderItemAsync(OrderId)"/>
+                </MudTooltip>
+            }
+
+            <MudTooltip Delay="500" Text="Перезагрузить список элементов заказа">
+                <MudIconButton
+                    Icon="@Icons.Material.Filled.Refresh"
+                    OnClick="ReloadModelAsync"/>
+            </MudTooltip>
+        }
+    </MudItem>
+
+    <MudGrid>
+        <MudItem xs="3" sm="3" md="3">
+
+        </MudItem>
+        <MudItem xs="6" sm="6" md="6">
+            <MudCard>
+                <MudCardContent>
+                    <MudGrid>
+                        <MudItem xs="6" sm="5" md="4">
+                            <MudText Class="label">Поставщик:</MudText>
+                        </MudItem>
+                        <MudItem xs="6" sm="8" md="8">
+                            <MudText>@_providers.FirstOrDefault(i => i.ProviderId == _model.ProviderId)?.Name</MudText>
+                        </MudItem>
+                        <MudItem xs="6" sm="5" md="4">
+                            <MudText Class="label">Номер:</MudText>
+                        </MudItem>
+                        <MudItem xs="6" sm="8" md="8">
+                            <MudText>@_model.Number</MudText>
+                        </MudItem>
+                        <MudItem xs="6" sm="4" md="4">
+                            <MudText Class="label">Дата:</MudText>
+                        </MudItem>
+                        <MudItem xs="6" sm="8" md="8">
+                            <MudText>@_model.Date.ToString("D")</MudText>
+                        </MudItem>
+                    </MudGrid>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="3" sm="3" md="3">
+
+        </MudItem>
+        <MudItem xs="12" sm="12" md="12">
+            <MudGrid>
+                <MudItem xs="3" sm="3" md="3">
+
+                </MudItem>
+                <MudItem xs="2" sm="2" md="2" Style="text-align: center">
+                    <MudTextField
+                        T="string"
+                        Label="Имя"
+                        Placeholder="Имя"
+                        Adornment="Adornment.Start"
+                        AdornmentIcon="@Icons.Material.Filled.Title"
+                        @bind-Value="@Name"
+                        Style="max-width: 300px"
+                        Immediate="false"
+                        IconSize="Size.Medium"/>
+                </MudItem>
+                <MudItem xs="2" sm="2" md="2" Style="text-align: center">
+                    <MudTextField
+                        T="string"
+                        Label="Единица"
+                        Placeholder="Единица"
+                        Adornment="Adornment.Start"
+                        AdornmentIcon="@Icons.Material.Filled.Title"
+                        @bind-Value="@Unit"
+                        Style="max-width: 300px"
+                        Immediate="false"
+                        IconSize="Size.Medium"/>
+                </MudItem>
+                <MudItem xs="2" sm="2" md="2" Style="margin: auto; text-align: center">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ReloadModelAsync">Применить фильтры</MudButton>
+                </MudItem>
+                <MudItem xs="3" sm="3" md="3">
+
+                </MudItem>
+            </MudGrid>
+        </MudItem>
+        <MudItem xs="12" sm="12" md="12">
+            <MudGrid>
+                @foreach (var modelOrderItem in _model.OrderItems)
+                {
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudCard>
+                            <MudCardContent>
+                                <MudGrid>
+                                    <MudItem xs="3" sm="3" md="3">
+                                        <MudText Class="label">Имя:</MudText>
+                                    </MudItem>
+                                    <MudItem xs="5" sm="5" md="5">
+                                        <MudText>@modelOrderItem.Name</MudText>
+                                    </MudItem>
+                                    <MudItem Style="text-align: end" xs="4" sm="4" md="4">
+                                        <MudTooltip Delay="500" Text="Редактировать">
+                                            <MudIconButton
+                                                Icon="@Icons.Material.Filled.Edit"
+                                                Size="Size.Small"
+                                                OnClick="@(() => ChangeOrderItemAsync(OrderId, modelOrderItem.OrderItemId, modelOrderItem.Name, modelOrderItem.Quantity, modelOrderItem.Unit))"/>
+                                        </MudTooltip>
+                                        <MudTooltip Delay="500" Text="Удалить">
+                                            <MudIconButton
+                                                Icon="@Icons.Material.Filled.Delete"
+                                                Size="Size.Small"
+                                                OnClick="@(() => RemoveOrderItemAsync(OrderId, modelOrderItem.OrderItemId))"/>
+                                        </MudTooltip>
+                                    </MudItem>
+                                    <MudDivider/>
+                                    <MudItem xs="6" sm="4" md="4">
+                                        <MudText Class="label">Количество:</MudText>
+                                    </MudItem>
+                                    <MudItem xs="6" sm="8" md="8">
+                                        <MudText>@modelOrderItem.Quantity</MudText>
+                                    </MudItem>
+                                    <MudItem xs="6" sm="4" md="4">
+                                        <MudText Class="label">Единица:</MudText>
+                                    </MudItem>
+                                    <MudItem xs="6" sm="8" md="8">
+                                        <MudText>@modelOrderItem.Unit</MudText>
+                                    </MudItem>
+                                </MudGrid>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudItem>
+    </MudGrid>
+</MudGrid>
+
+@code {
+
+    [Parameter]
+    public Guid OrderId { get; set; }
+
+    private string? Name { get; set; }
+    private string? Unit { get; set; }
+
+    private OrdersModel _model = new()
+    {
+        OrderItems = ArraySegment<OrderItemModel>.Empty
+    };
+
+    private bool _loading;
+    private bool _loaded;
+
+    private readonly List<BreadcrumbItem> _breadcrumbItems = new()
+    {
+        new BreadcrumbItem("Заказы", "/", icon: Icons.Material.Filled.Home),
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        _breadcrumbItems.Add(new BreadcrumbItem(OrderId.ToString(),
+            href: $"/order/{OrderId}", disabled: true));
+
+        _providers = await GetProviders();
+        await LoadModelAsync();
+
+        await base.OnInitializedAsync();
+    }
+
+    private Task LoadModelAsync() => LoadAsync(async () =>
+    {
+        var response = await ApiClient.GetOrderByIdAsync(OrderId, new GetOrderByIdRequest
+        {
+            Name = Name,
+            Unit = Unit
+        });
+
+        if (response.IsSuccessStatusCode)
+        {
+            _model.OrderId = response.Content.OrderId;
+            _model.ProviderId = response.Content.ProviderId;
+            _model.Number = response.Content.Number;
+            _model.Date = response.Content.Date;
+            _model.OrderItems = response.Content.OrderItems.Select(i => new OrderItemModel
+            {
+                OrderItemId = i.OrderItemId,
+                Name = i.Name,
+                Quantity = i.Quantity,
+                Unit = i.Unit,
+                CreatedOn = i.CreatedOn,
+                UpdatedOn = i.UpdatedOn
+            });
+            _model.CreatedOn = response.Content.CreatedOn;
+            _model.UpdatedOn = response.Content.UpdatedOn;
+
+            _loaded = true;
+
+    // StateHasChanged();
+        }
+        else
+        {
+            Snackbar.Add($"{response.StatusCode}: {response.Error?.Content ?? "Что то пошло не так"}", Severity.Error, options => { options.CloseAfterNavigation = true; });
+        }
+    });
+
+    private Task ReloadModelAsync() => LoadModelAsync();
+
+    private async Task LoadAsync(Func<Task> func)
+    {
+        _loading = false;
+
+        try
+        {
+            await func();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private IEnumerable<GetProvidersList> _providers = ArraySegment<GetProvidersList>.Empty;
+
+    private async Task<IEnumerable<GetProvidersList>> GetProviders()
+    {
+        var response = await ApiClient.GetProvidersAsync(new GetProvidersListRequest());
+
+        if (response.StatusCode == HttpStatusCode.OK)
+        {
+            return response.Content!;
+        }
+
+        return ArraySegment<GetProvidersList>.Empty;
+    }
+
+    private async Task CreateOrderItemAsync(Guid orderId)
+    {
+        var dialogReference = DialogService.Show<CreateOrderItemDialog>($"Создать элемент заказа", new DialogParameters
+        {
+            { "OrderId", orderId },
+        });
+
+        var dialogResult = await dialogReference.Result;
+
+        if (dialogResult.Canceled)
+        {
+            return;
+        }
+
+        await ReloadModelAsync();
+    }
+
+    private async Task ChangeOrderItemAsync(Guid orderId, Guid orderItemId, string name, decimal quantity, string unit)
+    {
+        var dialogReference = DialogService.Show<ChangeOrderItemDialog>($"Изменить параметры элемента заказа {name}", new DialogParameters
+        {
+            { "OrderId", orderId },
+            { "OrderItemId", orderItemId },
+            { "Name", name },
+            { "Quantity", quantity },
+            { "Unit", unit },
+        });
+        var dialogResult = await dialogReference.Result;
+
+        if (dialogResult.Canceled)
+        {
+            return;
+        }
+
+        await ReloadModelAsync();
+    }
+
+    private async Task RemoveOrderItemAsync(Guid orderId, Guid orderItemId)
+    {
+        var response = await ApiClient.RemoveOrderItemFromOrderAsync(orderId, orderItemId);
+
+        if (response.IsSuccessStatusCode)
+        {
+            Snackbar.Add($"Элемент заказа успешно удален", Severity.Success, options => { options.CloseAfterNavigation = true; });
+        }
+        else
+        {
+            Snackbar.Add($"{response.StatusCode}: {response.Error?.Content ?? "Что то пошло не так"}", Severity.Error, options => { options.CloseAfterNavigation = true; });
+        }
+
+        await ReloadModelAsync();
+    }
+
+    private sealed class OrdersModel
+    {
+        public Guid OrderId { get; set; }
+        public Guid ProviderId { get; set; }
+        public string Number { get; set; } = null!;
+        public DateTimeOffset Date { get; set; }
+        public IEnumerable<OrderItemModel> OrderItems { get; set; } = null!;
+        public DateTimeOffset CreatedOn { get; set; }
+        public DateTimeOffset UpdatedOn { get; set; }
+    }
+
+    private sealed class OrderItemModel
+    {
+        public Guid OrderItemId { get; set; }
+        public string Name { get; set; } = null!;
+        public decimal Quantity { get; set; }
+        public string Unit { get; init; } = null!;
+        public DateTimeOffset CreatedOn { get; set; }
+        public DateTimeOffset UpdatedOn { get; set; }
+    }
+
+}

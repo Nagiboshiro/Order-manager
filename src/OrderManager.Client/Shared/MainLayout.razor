@@ -1,0 +1,49 @@
+﻿@using OrderManager.Client.Themes
+@inherits LayoutComponentBase
+
+<MudThemeProvider Theme="_currentTheme" @bind-IsDarkMode="@_isDarkMode"/>
+<MudDialogProvider/>
+<MudSnackbarProvider/>
+
+
+<MudLayout>
+    <MudAppBar>
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => OnDrawerToggle())"/>
+        <MudSpacer/>
+        <MudTooltip Delay="500" Text="Day/Night">
+            <MudIconButton
+                Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+                Color="Color.Inherit"
+                OnClick="@(_ => _isDarkMode = !_isDarkMode)">
+
+            </MudIconButton>
+        </MudTooltip>
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="_drawerOpen" Elevation="1" >
+        <MudDrawerHeader>
+            <MudText Typo="Typo.h6"> Order manager</MudText>
+        </MudDrawerHeader>
+        <NavMenu/>
+    </MudDrawer>
+
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.False">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    readonly MudTheme _currentTheme = new DefaultTheme();
+
+    bool _drawerOpen;
+    bool _isDarkMode;
+    private MudTheme _theme = new();
+
+    void OnDrawerToggle()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+
+}

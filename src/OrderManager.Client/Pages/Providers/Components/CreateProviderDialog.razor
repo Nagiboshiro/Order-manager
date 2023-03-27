@@ -1,0 +1,97 @@
+﻿@using FluentValidation
+@using Microsoft.AspNetCore.Components
+@using OrderManager.Client.Extensions
+@using OrderManager.Integration.Http
+@using OrderManager.Integration.Http.Models.Providers
+@using Severity = MudBlazor.Severity
+
+@inject ISnackbar Snackbar;
+@inject IOrderManager ApiClient;
+
+          
+<MudDialog Style="min-width: 400px">
+    <DialogContent>
+        <MudText Style="text-align: center; font-weight: bold">Создать поставщика</MudText>
+        <MudForm Model="@_model" @bind-IsValid="@_modelIsValid" @ref="@_form">
+            <MudGrid>
+                <MudItem xs="12" sm="12" md="12">
+                    <MudTextField
+                        T="string"
+                        Label="Имя"
+                        Placeholder="Имя"
+                        Adornment="Adornment.Start"
+                        AdornmentIcon="@Icons.Material.Filled.Flag"
+                        @bind-Value="_model.Name"
+                        Validation="@(_modelValidator.ValidateValue())"
+                        For="@(() => _model.Name)"
+                        Immediate="false"
+                        IconSize="Size.Medium"/>
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Size="Size.Large" OnClick="Cancel">Отменить</MudButton>
+        <MudButton Size="Size.Large" OnClick="Submit" Color="Color.Primary">Создать</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    MudDialogInstance MudDialogInstance { get; set; } = null!;
+    
+    MudForm _form = null!;
+
+    private readonly CreateProviderModel.Validator _modelValidator = new();
+
+    private readonly CreateProviderModel _model = new();
+    
+    private bool _modelIsValid;
+
+    Task Submit() => CreateOrder();
+    void Cancel() => MudDialogInstance.Cancel();
+    
+    private async Task CreateOrder()
+    {
+        await _form.Validate();
+
+        if (_modelIsValid is false)
+        {
+            return;
+        }
+
+        var response = await ApiClient.CreateProviderAsync(new CreateProviderRequest
+        {
+            ProviderId = Guid.NewGuid(),
+            Name = _model.Name!,
+        });
+
+        if (response.IsSuccessStatusCode)
+        {
+            Snackbar.Add($"Поставщик успешно создан", Severity.Success, options => { options.CloseAfterNavigation = true; });
+            MudDialogInstance.Close(DialogResult.Ok(true));
+        }
+        else
+        {
+            Snackbar.Add($"{response.StatusCode}: {response.Error?.Content ?? "Что то пошло не так"}", Severity.Error, options => { options.CloseAfterNavigation = true; });
+        }
+    }
+    
+    private sealed class CreateProviderModel
+    {
+        public string? Name { get; set; } = null!;
+
+        internal sealed class Validator : AbstractValidator<CreateProviderModel>
+        {
+            public Validator()
+            {
+                RuleFor(m => m.Name)
+                    .NotEmpty()
+                    .MaximumLength(64)
+                    .When(d => string.IsNullOrWhiteSpace(d.Name) is false)
+                    .WithMessage("Length must be less than 64 or equal to 64");
+            }
+        }
+    }
+
+}

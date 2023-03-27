@@ -1,0 +1,25 @@
+.label {
+    font-weight: 500;
+}
+.rejected-payment {
+    background-color: rgba(244,47,70,0.058823529411764705) !important;
+}
+.rejected-payment:hover {
+    background-color: rgba(244,47,70,0.1) !important;
+}
+.rejected-request {
+    background-color: rgba(244,47,70,0.058823529411764705) !important;
+}
+.rejected-request:hover {
+    background-color: rgba(244,47,70,0.1) !important;
+}
+.mud-table-container .mud-table-root .mud-table-head .mud-table-row .mud-table-cell {
+    font-size: 0.8rem;
+}
+.mud-table-container .mud-table-root .mud-table-body .mud-table-row .mud-table-cell {
+    font-size: 0.8rem;
+}
+.mud-table-container .mud-table-root .mud-table-body .mud-table-row .mud-table-cell .mud-link {
+    font-size: 0.8rem;
+}
+

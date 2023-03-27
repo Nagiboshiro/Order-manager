@@ -1,0 +1,148 @@
+﻿@using OrderManager.Integration.Http
+@using FluentValidation
+@using Microsoft.AspNetCore.Components
+@using OrderManager.Client.Extensions
+@using OrderManager.Integration.Http.Models.OrderItems.Request
+@using Severity = MudBlazor.Severity
+
+@inject ISnackbar Snackbar;
+@inject IOrderManager ApiClient;
+
+<MudDialog>
+    <DialogContent>
+        <MudForm Model="@_model" @bind-IsValid="@_modelIsValid" @ref="@_form">
+            <MudGrid>
+                <MudItem xs="12" sm="12" md="12">
+                    <MudTextField
+                        T="string"
+                        Label="Имя"
+                        Placeholder="@Name"
+                        Adornment="Adornment.Start"
+                        AdornmentIcon="@Icons.Material.Filled.Title"
+                        @bind-Value="_model.Name"
+                        Validation="@(_modelValidator.ValidateValue())"
+                        For="@(() => _model.Name)"
+                        Immediate="false"
+                        IconSize="Size.Medium"/>
+                </MudItem>
+                <MudItem xs="12" sm="12" md="12">
+                    <MudTextField
+                        Format="F2" 
+                        Label="Количество"
+                        Placeholder="@Quantity.ToString()"
+                        Adornment="Adornment.Start"
+                        AdornmentIcon="@Icons.Material.Filled.Flag"
+                        @bind-Value="_model.Quantity"
+                        Validation="@(_modelValidator.ValidateValue())"
+                        For="@(() => _model.Quantity)"
+                        Immediate="false"
+                        IconSize="Size.Medium"/>    
+                </MudItem>
+                <MudItem xs="12" sm="12" md="12">
+                    <MudTextField
+                        T="string"
+                        Label="Единица"
+                        Placeholder="@Name"
+                        Adornment="Adornment.Start"
+                        AdornmentIcon="@Icons.Material.Filled.Title"
+                        @bind-Value="_model.Unit"
+                        Validation="@(_modelValidator.ValidateValue())"
+                        For="@(() => _model.Unit)"
+                        Immediate="false"
+                        IconSize="Size.Medium"/>
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton Size="Size.Large" OnClick="Cancel">Отменить</MudButton>
+        <MudButton Size="Size.Large" OnClick="Submit" Color="Color.Primary">Да</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+
+    [CascadingParameter]
+    MudDialogInstance MudDialogInstance { get; set; } = null!;
+
+    [Parameter]
+    public Guid OrderId { get; set; }
+
+    [Parameter]
+    public Guid OrderItemId { get; set; }
+
+    [Parameter]
+    public string? Name { get; set; }
+
+    [Parameter]
+    public decimal? Quantity { get; set; }
+
+    [Parameter]
+    public string? Unit { get; set; }
+
+    MudForm _form = null!;
+
+    private bool _modelIsValid;
+
+    private readonly ChangeOrderItemModel _model = new();
+
+    private readonly ChangeOrderItemModel.Validator _modelValidator = new();
+
+    protected override void OnParametersSet()
+    {
+        _model.Name = Name;
+        _model.Quantity = Quantity;
+        _model.Unit = Unit;
+    }
+
+    private async Task ChangeOrderItemAsync()
+    {
+        await _form.Validate();
+
+        if (_modelIsValid is false)
+        {
+            return;
+        }
+
+        var response = await ApiClient.ChangeOrderItemAsync(OrderId, OrderItemId, new ChangeOrderItemRequest
+        {
+            Name = _model.Name,
+            Quantity = Convert.ToDecimal(_model.Quantity),
+            Unit = _model.Unit,
+        });
+
+        if (response.IsSuccessStatusCode)
+        {
+            Snackbar.Add($"Параметры элемента заказа успешно обновлены", Severity.Success, options => { options.CloseAfterNavigation = true; });
+            MudDialogInstance.Close(DialogResult.Ok(true));
+        }
+        else
+        {
+            Snackbar.Add($"{response.StatusCode}: {response.Error?.Content ?? "Что то пошло не так"}", Severity.Error, options => { options.CloseAfterNavigation = true; });
+        }
+    }
+
+    Task Submit() => ChangeOrderItemAsync();
+    void Cancel() => MudDialogInstance.Cancel();
+
+    public sealed class ChangeOrderItemModel
+    {
+        public string? Name { get; set; }
+        public decimal? Quantity { get; set; }
+        public string? Unit { get; set; }
+
+        public sealed class Validator : AbstractValidator<ChangeOrderItemModel>
+        {
+            public Validator()
+            {
+                RuleFor(m => m.Name)
+                    .NotEmpty()
+                    .MaximumLength(64)
+                    .When(d => string.IsNullOrWhiteSpace(d.Name) is false)
+                    .WithMessage("Length must be less than 64 or equal to 64");
+            }
+        }
+    }
+
+}

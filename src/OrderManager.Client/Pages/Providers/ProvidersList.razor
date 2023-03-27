@@ -1,0 +1,198 @@
+﻿@page "/Providers"
+@using OrderManager.Client.Pages.Providers.Components
+@using OrderManager.Integration.Http
+
+@inject ISnackbar Snackbar;
+@inject IDialogService DialogService;
+@inject IOrderManager ApiClient;
+
+<PageTitle>Поставщики</PageTitle>
+
+<MudBreadcrumbs Items="_breadcrumbItems"/>
+
+<MudTable ServerData="@(new Func<TableState, Task<TableData<ProvidersModel>>>(OnLoadItemsAsync))"
+          Dense="true"
+          Hover="true"
+          Bordered="true"
+          Striped="true"
+          Virtualize="true"
+          Loading="@_loading"
+          LoadingProgressColor="Color.Info"
+          @ref="_table">
+    <ColGroup>
+        <col style="width: 33%;"/>
+        <col/>
+        <col/>
+    </ColGroup>
+    <ToolBarContent>
+        <MudTooltip Delay="500" Text="Создать поставщика">
+            <MudIconButton
+                Icon="@Icons.Material.Filled.Add"
+                OnClick="CreateProviderAsync"/>
+        </MudTooltip>
+        <MudTooltip Delay="500" Text="Перезагрузить списокds">
+            <MudIconButton
+                Icon="@Icons.Material.Filled.Refresh"
+                OnClick="ReloadItemsAsync"/>
+        </MudTooltip>
+        <MudGrid>
+            <MudItem xs="1" sm="1" md="1">
+
+            </MudItem>
+            <MudItem xs="3" sm="3" md="3">
+                <MudTextField
+                    T="string"
+                    Placeholder="Фильтр по имени"
+                    Adornment="Adornment.Start"
+                    AdornmentIcon="@Icons.Material.Filled.Search"
+                    @bind-Value="Name"
+                    Style="max-width: 300px"
+                    Immediate="true"
+                    IconSize="Size.Medium"/>
+            </MudItem>
+            <MudItem Style="margin: auto; text-align: center" xs="2" sm="2" md="2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ReloadItemsAsync">Применить фильтры</MudButton>
+            </MudItem>
+            <MudItem xs="6" sm="6" md="6">
+
+            </MudItem>
+        </MudGrid>
+        <MudSpacer/>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh>Ид</MudTh>
+        <MudTh>Имя</MudTh>
+        <MudTh>Действия</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="OrderId">@context.ProviderId</MudTd>
+        <MudTd DataLabel="Number">@context.Name</MudTd>
+        <MudTd>
+            <MudTooltip Text="Редактировать">
+                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                               Size="Size.Medium"
+                               OnClick="@(() => ChangeProviderAsync(context.ProviderId, context.Name))"/>
+            </MudTooltip>
+            <MudTooltip Text="Удалить">
+                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                               Size="Size.Medium"
+                               OnClick="@(() => DeleteProviderAsync(context.ProviderId))"/>
+            </MudTooltip>
+        </MudTd>
+    </RowTemplate>
+</MudTable>
+
+@code {
+    private string Name { get; set; } = null!;
+
+    private readonly List<BreadcrumbItem> _breadcrumbItems = new()
+    {
+        new BreadcrumbItem("Поставщики", "/providers", icon: Icons.Material.Filled.Home),
+    };
+
+    private bool _loading = true;
+
+    private MudTable<ProvidersModel> _table = null!;
+
+    private Task ReloadItemsAsync() => _table.ReloadServerData();
+
+    private async Task<TableData<ProvidersModel>> OnLoadItemsAsync(TableState tableState)
+    {
+        _loading = true;
+
+        try
+        {
+            var response = await ApiClient.GetProvidersAsync(new GetProvidersListRequest
+            {
+                Name = Name
+            });
+            if (response.IsSuccessStatusCode)
+            {
+                var tableData = new TableData<ProvidersModel>
+                {
+                    Items = response.Content!
+                        .Select(o => new ProvidersModel
+                        {
+                            ProviderId = o.ProviderId,
+                            Name = o.Name,
+                            CreatedOn = o.CreatedOn,
+                            UpdatedOn = o.UpdatedOn
+                        })
+                };
+
+                return tableData;
+            }
+
+            Snackbar.Add($"{response.StatusCode}: {response.Error?.Content ?? "Что то пошло не так"}", Severity.Error, options => { options.CloseAfterNavigation = true; });
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+        }
+        finally
+        {
+            _loading = false;
+        }
+
+        return new TableData<ProvidersModel>
+        {
+            TotalItems = 0,
+            Items = Array.Empty<ProvidersModel>()
+        };
+    }
+
+    private async Task CreateProviderAsync()
+    {
+        var dialogReference = DialogService.Show<CreateProviderDialog>();
+        var dialogResult = await dialogReference.Result;
+
+        if (dialogResult.Canceled)
+        {
+            return;
+        }
+
+        await ReloadItemsAsync();
+    }
+
+    private async Task ChangeProviderAsync(Guid providerId, string name)
+    {
+        var dialogReference = DialogService.Show<ChangeProviderDialog>($"Изменить параметры поставщика {name}", new DialogParameters
+        {
+            { "ProviderId", providerId },
+            { "Name", name },
+        });
+        var dialogResult = await dialogReference.Result;
+
+        if (dialogResult.Canceled)
+        {
+            return;
+        }
+
+        await ReloadItemsAsync();
+    }
+
+    private async Task DeleteProviderAsync(Guid providerId)
+    {
+        var response = await ApiClient.DeleteProviderAsync(providerId);
+
+        if (response.IsSuccessStatusCode)
+        {
+            Snackbar.Add($"Поставщик успешно удален", Severity.Success, options => { options.CloseAfterNavigation = true; });
+        }
+        else
+        {
+            Snackbar.Add($"{response.StatusCode}: {response.Error?.Content ?? "Что то пошло не так"}", Severity.Error, options => { options.CloseAfterNavigation = true; });
+        }
+
+        await ReloadItemsAsync();
+    }
+
+    private sealed class ProvidersModel
+    {
+        public Guid ProviderId { get; init; }
+        public string Name { get; init; } = null!;
+        public DateTimeOffset CreatedOn { get; init; }
+        public DateTimeOffset UpdatedOn { get; init; }
+    }
+
+}

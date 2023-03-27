@@ -1,0 +1,110 @@
+﻿@using OrderManager.Integration.Http
+@using FluentValidation
+@using OrderManager.Client.Extensions
+@using OrderManager.Integration.Http.Models.Providers
+@using Severity = MudBlazor.Severity
+
+@inject ISnackbar Snackbar;
+@inject IOrderManager ApiClient;
+
+<MudDialog Style="min-width: 400px">
+    <DialogContent>
+        <MudForm Model="@_model" @bind-IsValid="@_modelIsValid" @ref="@_form">
+            <MudGrid>
+                <MudItem xs="12" sm="12" md="12">
+                    <MudTextField
+                        T="string"
+                        Label="Имя"
+                        Placeholder="@Name"
+                        Adornment="Adornment.Start"
+                        AdornmentIcon="@Icons.Material.Filled.Title"
+                        @bind-Value="_model.Name"
+                        Validation="@(_modelValidator.ValidateValue())"
+                        For="@(() => _model.Name)"
+                        Immediate="false"
+                        IconSize="Size.Medium"/>
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton Size="Size.Large" OnClick="Cancel">Отменить</MudButton>
+        <MudButton Size="Size.Large" OnClick="Submit" Color="Color.Primary">Да</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    MudDialogInstance MudDialogInstance { get; set; } = null!;
+    
+    [Parameter]
+    public Guid ProviderId { get; set; }
+    
+    [Parameter]
+    public string? Name { get; set; }
+    
+    private bool _modelIsValid;
+
+    MudForm _form = null!;
+
+    private readonly ChangeProviderModel.Validator _modelValidator = new();
+    private readonly ChangeProviderModel _model = new();
+
+    
+    protected override void OnParametersSet()
+    {
+        _model.Name = Name;
+    }
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+    }
+    
+    Task Submit() => ChangeProvider();
+    void Cancel() => MudDialogInstance.Cancel();
+    
+    private async Task ChangeProvider()
+    {
+        await _form.Validate();
+
+        if (_modelIsValid is false)
+        {
+            return;
+        }
+
+        var response = await ApiClient.ChangeProviderAsync(
+            ProviderId, new ChangeProviderRequest
+        {
+            Name = _model.Name,
+        });
+
+        if (response.IsSuccessStatusCode)
+        {
+            Snackbar.Add($"Параметры поставщика успешно обновлены", Severity.Success, options => { options.CloseAfterNavigation = true; });
+            MudDialogInstance.Close(DialogResult.Ok(true));
+        }
+        else
+        {
+            Snackbar.Add($"{response.StatusCode}: {response.Error?.Content ?? "Что то пошло не так"}", Severity.Error, options => { options.CloseAfterNavigation = true; });
+        }
+    }
+    
+    
+    private sealed class ChangeProviderModel
+    {
+        public string? Name { get; set; } = null!;
+
+        internal sealed class Validator : AbstractValidator<ChangeProviderModel>
+        {
+            public Validator()
+            {
+                RuleFor(m => m.Name)
+                    .NotEmpty()
+                    .WithMessage("Must be provided");
+            }
+        }
+    }
+    
+}

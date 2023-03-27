@@ -1,0 +1,139 @@
+﻿@using Severity = MudBlazor.Severity
+@using FluentValidation
+@using OrderManager.Client.Extensions
+@using OrderManager.Integration.Http
+@using OrderManager.Integration.Http.Models.OrderItems.Request
+
+@inject ISnackbar Snackbar;
+@inject IOrderManager ApiClient;
+
+<MudDialog>
+    <DialogContent>
+        <MudForm Model="@_model" @bind-IsValid="@_modelIsValid" @ref="@_form">
+            <MudGrid>
+                <MudItem xs="12" sm="12" md="12">
+                    <MudTextField
+                        T="string"
+                        Label="Имя"
+                        Placeholder="Имя"
+                        Adornment="Adornment.Start"
+                        AdornmentIcon="@Icons.Material.Filled.Title"
+                        @bind-Value="_model.Name"
+                        Validation="@(_modelValidator.ValidateValue())"
+                        For="@(() => _model.Name)"
+                        Immediate="false"
+                        IconSize="Size.Medium"/>
+                </MudItem>
+                <MudItem xs="12" sm="12" md="12">
+                    <MudTextField
+                        Format="F2"
+                        Label="Количество"
+                        Placeholder="Количество"
+                        Adornment="Adornment.Start"
+                        AdornmentIcon="@Icons.Material.Filled.Flag"
+                        @bind-Value="_model.Quantity"
+                        Validation="@(_modelValidator.ValidateValue())"
+                        For="@(() => _model.Quantity)"
+                        Immediate="false"
+                        IconSize="Size.Medium"/>
+                </MudItem>
+                <MudItem xs="12" sm="12" md="12">
+                    <MudTextField
+                        T="string"
+                        Label="Единица"
+                        Placeholder="Единица"
+                        Adornment="Adornment.Start"
+                        AdornmentIcon="@Icons.Material.Filled.Title"
+                        @bind-Value="_model.Unit"
+                        Validation="@(_modelValidator.ValidateValue())"
+                        For="@(() => _model.Unit)"
+                        Immediate="false"
+                        IconSize="Size.Medium"/>
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton Size="Size.Large" OnClick="Cancel">Отменить</MudButton>
+        <MudButton Size="Size.Large" OnClick="Submit" Color="Color.Primary">Да</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    MudDialogInstance MudDialogInstance { get; set; } = null!;
+    
+    [Parameter]
+    public Guid OrderId { get; set; }
+    
+    MudForm _form = null!;
+    
+    private bool _modelIsValid;
+    
+    Task Submit() => AddOrderItemToOrderAsync();
+    void Cancel() => MudDialogInstance.Cancel();
+    
+    private readonly AddOrderItemToOrderModel _model = new()
+    {
+        OrderItemId = Guid.NewGuid(),
+        Quantity = 1m
+    };
+    
+    private readonly AddOrderItemToOrderModel.Validator _modelValidator = new();
+    
+    private async Task AddOrderItemToOrderAsync()
+    {
+        await _form.Validate();
+
+        if (_modelIsValid is false)
+        {
+            return;
+        }
+
+        var response = await ApiClient.AddOrderItemToOrderAsync(OrderId ,new AddOrderItemToOrderRequest
+        {
+            OrderItemId = _model.OrderItemId,
+            Name = _model.Name,
+            Quantity = _model.Quantity,
+            Unit = _model.Unit
+        });
+
+        if (response.IsSuccessStatusCode)
+        {
+            Snackbar.Add($"Элемент заказа успешно создан", Severity.Success, options => { options.CloseAfterNavigation = true; });
+            MudDialogInstance.Close(DialogResult.Ok(true));
+        }
+        else
+        {
+            Snackbar.Add($"{response.StatusCode}: {response.Error?.Content ?? "Что то пошло не так"}", Severity.Error, options => { options.CloseAfterNavigation = true; });
+        }
+    }
+    
+    private sealed class AddOrderItemToOrderModel
+    {
+        public Guid OrderItemId { get; set; }
+        public decimal Quantity { get; set; }
+        public string Unit { get; set; } = null!;
+        public string Name { get; set; } = null!;
+
+        internal sealed class Validator : AbstractValidator<AddOrderItemToOrderModel>
+        {
+            public Validator()
+            {
+                RuleFor(m => m.OrderItemId)
+                    .NotEmpty()
+                    .WithMessage("Must be provided");
+
+                RuleFor(m => m.Name)
+                    .NotEmpty()
+                    .WithMessage("Must be provided");
+
+                RuleFor(m => m.Unit)
+                    .NotEmpty()
+                    .WithMessage("Must be provided");
+            }
+        }
+    }
+
+}
