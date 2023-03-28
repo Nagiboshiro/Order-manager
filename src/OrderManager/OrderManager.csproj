@@ -4,6 +4,8 @@
         <TargetFramework>net7.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
+        <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+        <UserSecretsId>f0b3003c-716c-4d32-b22a-0fb0c7c6dd26</UserSecretsId>
     </PropertyGroup>
 
     <PropertyGroup>
@@ -36,6 +38,12 @@
     <ItemGroup>
       <ProjectReference Include="..\OrderManager.Application\OrderManager.Application.csproj" />
       <ProjectReference Include="..\OrderManager.DataAccess.Postgres\OrderManager.DataAccess.Postgres.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Content Include="..\..\.dockerignore">
+        <Link>.dockerignore</Link>
+      </Content>
     </ItemGroup>
 
 </Project>

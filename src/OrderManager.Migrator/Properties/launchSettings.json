@@ -1,6 +1,6 @@
 ﻿{
   "profiles": {
-    "PaymentManager.Migrator": {
+    "OrderManager.Migrator": {
       "commandName": "Project",
       "environmentVariables": {
         "DOTNET_ENVIRONMENT": "Development"
